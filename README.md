@@ -1,5 +1,7 @@
 # retardmax
 
+![retardmax, Claude Code](assets/banner.jpg)
+
 A Claude Code mod that works the opposite way to `ultrathink`. Put the word `retardmax` anywhere in a prompt and that turn runs at the **lowest reasoning effort** (`low`). Every subagent started during the turn also runs at `low`, for as long as it keeps running.
 
 ![retardmax in the Claude Code prompt](assets/preview.gif)
