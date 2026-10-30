@@ -50,3 +50,33 @@ test('a quoted mention is neither painted nor armed', async ($, on) => {
     [21, 22, 23, 24, 25, 26, 27, 28, 29],
   )
 })
+
+test('the typed word is spelled rEtArDmAx, one or two letters off; a quoted one as typed', async ($, on) => {
+  on('prompt.edit', (_, e) => ({ text: e.text + e.inputText, cursor: e.cursor + 1 }))
+  on('clock.every', () => ({ value: undefined }))
+
+  const edit = ($.prompt as unknown as { edit: Edit }).edit
+  const text = 'fix "retardmax" then RETARDMA'
+  const box = await edit({ origin: { kind: 'composer' }, text, cursor: text.length, start: text.length, end: text.length, inputText: 'x' })
+
+  expect(box.text.slice(0, 21)).toBe('fix "retardmax" then ')
+  const word = box.text.slice(21)
+  expect(word.toLowerCase()).toBe('retardmax')
+  const off = [...word].filter((c, i) => c !== 'rEtArDmAx'[i]).length
+  expect(off >= 1 && off <= 2).toBe(true)
+  expect(box.cursor).toBe(box.text.length)
+})
+
+test('only the word on its own counts', async ($, on) => {
+  on('prompt.edit', (_, e) => ({ text: e.text + e.inputText, cursor: e.cursor + 1 }))
+  on('clock.every', () => ({ value: undefined }))
+
+  const edit = ($.prompt as unknown as { edit: Edit }).edit
+  const lit = async (text: string) =>
+    ((await edit({ origin: { kind: 'composer' }, text, cursor: text.length, start: text.length, end: text.length, inputText: ' ' })).decorations ?? []).length > 0
+
+  for (const text of ['google.com/retardmax', 'retardmax-ish', 'xretardmax', 'retardmax_v2', 'the.retardmax', '@retardmax'])
+    expect(await lit(text)).toBe(false)
+  for (const text of ['retardmax', 'ok retardmax.', '(retardmax)', 'retardmax, then', 'fix it\nretardmax'])
+    expect(await lit(text)).toBe(true)
+})

@@ -1,9 +1,16 @@
 import { atom, read, update } from 'claude-code'
-import type { PromptDecoration, Register, Timer } from 'claude-code'
+import type { PromptBox, PromptDecoration, PromptFillArgs, PromptPaintArgs, Register, Timer } from 'claude-code'
 
-const KEYWORD = /\bretardmax\b/gi
+// The word on its own, as ultrathink's: after the start, a space, an opening
+// bracket or a quote; before the end, a space, punctuation, a closing bracket
+// or a quote. `google.com/retardmax` and `retardmax-ish` are not uses.
+const KEYWORD = /(?<=^|[\s([{"'`\u201c\u2018])retardmax(?=$|[\s.,!?;:)\]}"'`\u201d\u2019])/gi
 const EFFORT = 'low'
 const FRAME_MS = 90
+// The case changes every CASE_FRAMES frames, and only once the person has
+// paused for IDLE_MS: it rewrites the draft, which a keystroke could cross.
+const CASE_FRAMES = 4
+const IDLE_MS = 300
 const NOTE = 'Minimal reasoning requested for this turn'
 
 // Quote pairs that mention the word rather than use it, as ultrathink's.
@@ -20,6 +27,27 @@ const uses = (text: string) =>
   })
 
 const hasKeyword = (text: string) => uses(text).length > 0
+
+// Glitchy spongebob: every use spelled rEtArDmAx, but one or two letters
+// flip to the wrong case, others each `caseFrame`. The same length, so
+// offsets and the caret stand.
+const recase = (text: string, caseFrame: number) =>
+  uses(text).reduce((out, match) => {
+    const n = match[0].length
+    const g1 = Math.floor(hash(caseFrame, 601) * n)
+    const g2 = hash(caseFrame, 602) < 0.5 ? Math.floor(hash(caseFrame, 603) * n) : -1
+    const word = [...match[0]]
+      .map((c, i) => ((i % 2 === 1) !== (i === g1 || i === g2) ? c.toUpperCase() : c.toLowerCase()))
+      .join('')
+    return out.slice(0, match.index) + word + out.slice(match.index + n)
+  }, text)
+
+// What one animation frame reaches through `$`, spelled at the hook's call site.
+type Io = {
+  read: () => Promise<PromptBox>
+  paint: (args: PromptPaintArgs) => Promise<unknown>
+  fill: (args: PromptFillArgs) => Promise<unknown>
+}
 
 // Drunk rainbow with a derpy bounce: the hue sloshes on layered sines, the
 // gaps between letters wobble and now and then hiccup, while a lopsided wave
@@ -78,6 +106,7 @@ export const register: Register = on => {
   let isLit = false
   let ticker: Timer | undefined
   let phase = 0
+  let editedAt = 0
 
   // Effort: armed by the prompt, held by its main turn and the agents it starts.
   let isArmed = false
@@ -93,6 +122,21 @@ export const register: Register = on => {
     ticker = undefined
   }
 
+  // Repaints the colours every frame; on a case frame, with the person idle,
+  // rewrites the draft with the new casing and its colours in one write.
+  const frame = async (io: Io) => {
+    const { text, cursor } = await io.read()
+    if (!isLit || !hasKeyword(text)) return stop()
+    phase += 1
+    const recased = recase(text, Math.floor(phase / CASE_FRAMES))
+    const isIdle = performance.now() - editedAt > IDLE_MS
+    if (recased !== text && isIdle) {
+      await io.fill({ text: recased, mode: 'replace', cursor, decorations: rainbow(recased, phase) })
+    } else {
+      await io.paint({ text, decorations: rainbow(text, phase) })
+    }
+  }
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !(await read($, isDrafted))) return next(e)
     const { Box, Text } = $.ui.resolve(e)
@@ -105,19 +149,22 @@ export const register: Register = on => {
 
   // Paint on the keystroke itself so the word never flashes uncoloured.
   on('prompt.edit', async ($, e, next) => {
-    const box = await next(e)
+    editedAt = performance.now()
+    const typed = await next(e)
+    const box = { ...typed, text: recase(typed.text, Math.floor(phase / CASE_FRAMES)) }
     isLit = hasKeyword(box.text)
     if (isNoted !== isLit) {
       isNoted = isLit
       await update($, isDrafted, () => isLit)
     }
     if (!isLit) return box
-    ticker ??= $.clock.every(FRAME_MS, async () => {
-      const { text } = await $.prompt.read()
-      if (!isLit || !hasKeyword(text)) return stop()
-      phase += 1
-      await $.prompt.paint({ text, decorations: rainbow(text, phase) })
-    })
+    ticker ??= $.clock.every(FRAME_MS, () =>
+      frame({
+        read: () => $.prompt.read(),
+        paint: args => $.prompt.paint(args),
+        fill: args => $.prompt.fill(args),
+      }),
+    )
     return {
       ...box,
       decorations: [...(box.decorations ?? []), ...rainbow(box.text, phase)],
@@ -132,12 +179,13 @@ export const register: Register = on => {
       await update($, isDrafted, () => isLit)
     }
     if (isLit) {
-      ticker ??= $.clock.every(FRAME_MS, async () => {
-        const { text } = await $.prompt.read()
-        if (!isLit || !hasKeyword(text)) return stop()
-        phase += 1
-        await $.prompt.paint({ text, decorations: rainbow(text, phase) })
-      })
+      ticker ??= $.clock.every(FRAME_MS, () =>
+        frame({
+          read: () => $.prompt.read(),
+          paint: args => $.prompt.paint(args),
+          fill: args => $.prompt.fill(args),
+        }),
+      )
     }
     return next(e)
   })
