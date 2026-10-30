@@ -2,7 +2,7 @@
 
 A Claude Code mod that works the opposite way to `ultrathink`. Put the word `retardmax` anywhere in a prompt and that turn runs at the **lowest reasoning effort** (`low`). Every subagent started during the turn also runs at `low`, for as long as it keeps running.
 
-While you type, the word is spelled `rEtArDmAx`, with a letter or two glitching to the wrong case, turns into an animated rainbow and a dim *Minimal reasoning requested for this turn* note appears above the prompt. A quoted mention (`"retardmax"`, `'retardmax'`, `` `retardmax` ``) triggers nothing, and neither does the word inside a bigger one (`google.com/retardmax`, `retardmax-ish`): the same as with `ultrathink`.
+While you type, the word is respelled `rEtArDmAx` (a letter or two glitching to the wrong case) and animated as a drunk rainbow, and a dim *Minimal reasoning requested for this turn* note appears above the prompt. A quoted mention (`"retardmax"`, `'retardmax'`, `` `retardmax` ``) triggers nothing, and neither does the word inside a bigger one (`google.com/retardmax`, `retardmax-ish`): the same as with `ultrathink`.
 
 ## Install
 
