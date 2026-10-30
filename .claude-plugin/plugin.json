@@ -1,0 +1,10 @@
+{
+  "name": "retardmax",
+  "version": "0.1.0",
+  "description": "Type 'retardmax' in a prompt to run that turn, and every subagent it launches, at minimum reasoning effort. The opposite of ultrathink.",
+  "author": {
+    "name": "stablyai"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "claude-retardmax",
+  "owner": {
+    "name": "stablyai"
+  },
+  "plugins": [
+    {
+      "name": "retardmax",
+      "source": "./"
+    }
+  ],
+  "description": "The retardmax mod: minimum-effort turns, the opposite of ultrathink."
+}
