@@ -80,3 +80,15 @@ test('only the word on its own counts', async ($, on) => {
   for (const text of ['retardmax', 'ok retardmax.', '(retardmax)', 'retardmax, then', 'fix it\nretardmax'])
     expect(await lit(text)).toBe(true)
 })
+
+test('quoting a lit word spells it back in lower case', async ($, on) => {
+  on('prompt.edit', (_, e) => ({ text: e.text + e.inputText, cursor: e.cursor + 1 }))
+  on('clock.every', () => ({ value: undefined }))
+
+  const edit = ($.prompt as unknown as { edit: Edit }).edit
+  const text = 'a "rEtArDmAx'
+  const box = await edit({ origin: { kind: 'composer' }, text, cursor: text.length, start: text.length, end: text.length, inputText: '"' })
+
+  expect(box.text).toBe('a "retardmax"')
+  expect(box.decorations ?? []).toEqual([])
+})

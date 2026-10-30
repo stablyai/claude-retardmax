@@ -28,6 +28,18 @@ const uses = (text: string) =>
 
 const hasKeyword = (text: string) => uses(text).length > 0
 
+// A use the person then quoted keeps the case the mod gave it; spell any
+// quoted mention in mixed case back in lower case.
+const uncase = (text: string) =>
+  [...text.matchAll(KEYWORD)]
+    .filter(match => !uses(text).some(use => use.index === match.index))
+    .filter(match => match[0] !== match[0].toLowerCase() && match[0] !== match[0].toUpperCase())
+    .reduce(
+      (out, match) =>
+        out.slice(0, match.index) + match[0].toLowerCase() + out.slice(match.index + match[0].length),
+      text,
+    )
+
 // Glitchy spongebob: every use spelled rEtArDmAx, but one or two letters
 // flip to the wrong case, others each `caseFrame`. The same length, so
 // offsets and the caret stand.
@@ -126,7 +138,12 @@ export const register: Register = on => {
   // rewrites the draft with the new casing and its colours in one write.
   const frame = async (io: Io) => {
     const { text, cursor } = await io.read()
-    if (!isLit || !hasKeyword(text)) return stop()
+    if (!isLit || !hasKeyword(text)) {
+      // The last frame's paint outlives the edit that ended it in the terminal.
+      stop()
+      await io.paint({ decorations: [] })
+      return
+    }
     phase += 1
     const recased = recase(text, Math.floor(phase / CASE_FRAMES))
     const isIdle = performance.now() - editedAt > IDLE_MS
@@ -151,7 +168,7 @@ export const register: Register = on => {
   on('prompt.edit', async ($, e, next) => {
     editedAt = performance.now()
     const typed = await next(e)
-    const box = { ...typed, text: recase(typed.text, Math.floor(phase / CASE_FRAMES)) }
+    const box = { ...typed, text: uncase(recase(typed.text, Math.floor(phase / CASE_FRAMES))) }
     isLit = hasKeyword(box.text)
     if (isNoted !== isLit) {
       isNoted = isLit
